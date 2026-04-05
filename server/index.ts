@@ -5,17 +5,21 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import marketsRoutes from './routes/markets.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const __dirname = (() => {
+  try { return path.dirname(fileURLToPath(import.meta.url)) } catch { return process.cwd() }
+})()
 const app = express()
 const PORT = process.env.API_PORT || 3001
+
+// Paths — overridable via env vars for the packaged Electron app
+const dataDir = process.env.MARKETS_DATA_DIR ?? path.join(__dirname, 'data')
+const settingsFile = path.join(dataDir, 'settings.json')
+const distPath = process.env.MARKETS_DIST_DIR ?? path.join(__dirname, '..', 'dist')
 
 app.use(cors({ origin: true }))
 app.use(express.json({ limit: '20mb' }))
 
 app.use('/api/markets', marketsRoutes)
-
-// Serve settings for chart style preference
-const settingsFile = path.join(__dirname, 'data', 'settings.json')
 
 function readSettings() {
   try {
@@ -26,8 +30,7 @@ function readSettings() {
 }
 
 function writeSettings(data: any) {
-  const dir = path.dirname(settingsFile)
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   fs.writeFileSync(settingsFile, JSON.stringify(data, null, 2), 'utf-8')
 }
 
@@ -51,8 +54,7 @@ app.put('/api/settings/market-preferences', (req, res) => {
   res.json({ ok: true })
 })
 
-// In production, serve the built frontend
-const distPath = path.join(__dirname, '..', 'dist')
+// Serve the built frontend (used in production/Electron)
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath))
   app.get('{*path}', (_req, res) => {
@@ -60,6 +62,6 @@ if (fs.existsSync(distPath)) {
   })
 }
 
-app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`Markets API running on http://localhost:${PORT}`)
+app.listen(Number(PORT), '127.0.0.1', () => {
+  console.log(`Markets API running on http://127.0.0.1:${PORT}`)
 })

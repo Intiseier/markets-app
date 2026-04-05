@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-node/
+release/
+resources/server.cjs
 *.tsbuildinfo
 .env
 *.local

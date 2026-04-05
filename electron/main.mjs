@@ -1,34 +1,42 @@
 import { app, BrowserWindow, shell } from 'electron'
-import { spawn } from 'child_process'
+import { createRequire } from 'module'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import http from 'http'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
+const require = createRequire(import.meta.url)
 
 let mainWindow
-let apiProcess
+
+function waitForServer(url, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now()
+    function check() {
+      http.get(url, (res) => {
+        if (res.statusCode < 500) resolve()
+        else retry()
+      }).on('error', () => {
+        if (Date.now() - start > timeout) reject(new Error('API server timed out'))
+        else setTimeout(check, 200)
+      })
+    }
+    function retry() {
+      if (Date.now() - start > timeout) reject(new Error('API server timed out'))
+      else setTimeout(check, 200)
+    }
+    check()
+  })
+}
 
 function startApiServer() {
-  const serverPath = path.join(__dirname, '..', 'server', 'index.ts')
-  apiProcess = spawn('npx', ['tsx', serverPath], {
-    cwd: path.join(__dirname, '..'),
-    shell: true,
-    env: { ...process.env, API_PORT: '3001' },
-    stdio: 'pipe',
-  })
-
-  apiProcess.stdout?.on('data', (data) => {
-    console.log(`[API] ${data.toString().trim()}`)
-  })
-
-  apiProcess.stderr?.on('data', (data) => {
-    console.error(`[API] ${data.toString().trim()}`)
-  })
-
-  apiProcess.on('error', (err) => {
-    console.error('Failed to start API server:', err)
-  })
+  const userData = app.getPath('userData')
+  process.env.API_PORT = '3001'
+  process.env.MARKETS_DATA_DIR = path.join(userData, 'data')
+  process.env.MARKETS_DIST_DIR = path.join(process.resourcesPath, 'dist')
+  // Run server in-process — no child process needed
+  require(path.join(process.resourcesPath, 'server.cjs'))
 }
 
 function createWindow() {
@@ -46,7 +54,6 @@ function createWindow() {
     },
   })
 
-  // Open external links in the default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
@@ -55,7 +62,7 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+    mainWindow.loadURL('http://localhost:3001')
   }
 
   mainWindow.on('closed', () => {
@@ -63,14 +70,17 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (isDev) {
-    // In dev mode, the API server is started separately via npm run electron
     createWindow()
   } else {
     startApiServer()
-    // Give the API server a moment to start
-    setTimeout(createWindow, 1500)
+    try {
+      await waitForServer('http://localhost:3001/api/settings')
+    } catch (e) {
+      console.error('Server did not start:', e)
+    }
+    createWindow()
   }
 
   app.on('activate', () => {
@@ -81,16 +91,5 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (apiProcess) {
-    apiProcess.kill()
-  }
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
-
-app.on('before-quit', () => {
-  if (apiProcess) {
-    apiProcess.kill()
-  }
+  if (process.platform !== 'darwin') app.quit()
 })

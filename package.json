@@ -9,9 +9,10 @@
     "dev:ui": "vite",
     "dev:api": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --external:electron --outfile=resources/server.cjs --format=cjs",
     "preview": "vite preview",
-    "electron": "concurrently --kill-others-on-fail --names api,electron \"npm run dev:api\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder",
+    "electron": "concurrently --kill-others-on-fail --names api,ui,electron \"npm run dev:api\" \"npm run dev:ui\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && npm run build:server && electron-builder",
     "start": "npm run dev"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "concurrently": "^9.2.1",
     "electron": "^35.2.1",
     "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
@@ -45,19 +47,21 @@
   "build": {
     "appId": "com.mason.markets",
     "productName": "Markets",
+    "directories": {
+      "output": "release"
+    },
     "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "server/**/*",
-      "node_modules/**/*"
+      "electron/**/*"
+    ],
+    "extraResources": [
+      { "from": "dist", "to": "dist" },
+      { "from": "resources/server.cjs", "to": "server.cjs" }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "target": ["nsis", "portable"]
     },
     "mac": {
-      "target": "dmg",
-      "icon": "public/icon.png"
+      "target": "dmg"
     },
     "linux": {
       "target": "AppImage"
