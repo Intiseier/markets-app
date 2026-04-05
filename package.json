@@ -1,0 +1,66 @@
+{
+  "name": "markets-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names api,ui \"npm run dev:api\" \"npm run dev:ui\"",
+    "dev:ui": "vite",
+    "dev:api": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "electron": "concurrently --kill-others-on-fail --names api,electron \"npm run dev:api\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "start": "npm run dev"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.91.2",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "express": "^5.2.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "electron": "^35.2.1",
+    "electron-builder": "^26.0.12",
+    "tailwindcss": "^4.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.mason.markets",
+    "productName": "Markets",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.png"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
