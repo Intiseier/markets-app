@@ -1,5 +1,14 @@
 import { Router } from 'express'
 import { readStore, writeStore } from '../lib/store.js'
+import { getApiKey, readSettings } from '../lib/settings-store.js'
+import {
+  detectAiProvider,
+  aiProviderLabel,
+  buildAiPrompt,
+  generateAiInsight,
+  getCachedAiInsight,
+  setCachedAiInsight,
+} from '../lib/ai-provider.js'
 
 const router = Router()
 
@@ -94,7 +103,7 @@ interface HorizonAnalysis {
   support: number | null
   resistance: number | null
   streetView: string
-  masonView: string
+  aiView: string
   drivers: string[]
   risks: string[]
   scoreBreakdown: {
@@ -228,11 +237,11 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 function getAnalystFeedApiKey() {
-  return process.env.FMP_API_KEY || process.env.FINANCIAL_MODELING_PREP_API_KEY || ''
+  return getApiKey('fmp') ?? ''
 }
 
 function getTwelveDataApiKey() {
-  return process.env.TWELVEDATA_API_KEY || ''
+  return getApiKey('twelvedata') ?? ''
 }
 
 function buildFmpUrl(path: string, params: Record<string, string | number | undefined>, apiKey: string) {
@@ -859,7 +868,7 @@ function describeStreetView(
   return `Street view (${label}): ${toneText} with ${positive} positive, ${negative} negative, and ${neutral} neutral headlines; ${analystText}.${consensusText}`
 }
 
-function describeMasonView(
+function describeFallbackAiView(
   label: string,
   tone: MarketTone,
   priceChangePercent: number,
@@ -894,10 +903,10 @@ function describeMasonView(
 
   const analystOverlay =
     analystContext && (analystContext.rating !== null || analystContext.targetConsensus !== null)
-      ? ` Mason overlays that with a ${analystContext?.rating ?? 'mixed'} Street rating and a consensus target near ${analystContext?.targetConsensus?.toFixed(2) ?? '--'}.`
+      ? ` Street consensus points to a ${analystContext?.rating ?? 'mixed'} rating with a target near ${analystContext?.targetConsensus?.toFixed(2) ?? '--'}.`
       : ''
 
-  return `Mason view (${label}): ${structureText}; return is ${formatSignedPercent(priceChangePercent)}, average swing is ${volatilityPercent.toFixed(2)}%, and ${volumeText}. ${levelText}${analystOverlay}`
+  return `MehAI (${label}): ${structureText}; return is ${formatSignedPercent(priceChangePercent)}, average swing is ${volatilityPercent.toFixed(2)}%, and ${volumeText}. ${levelText}${analystOverlay}`
 }
 
 function getAnalystAlignment(
@@ -1075,7 +1084,7 @@ function buildHorizonAnalysis(
       signals.analystMentions,
       analystContext,
     ),
-    masonView: describeMasonView(
+    aiView: describeFallbackAiView(
       label,
       tone,
       priceChangePercent,
@@ -1188,15 +1197,17 @@ async function buildMarketInsight(symbol: string) {
         : signals.positive + signals.negative + signals.neutral > 0
           ? `Recent public commentary is ${signals.positive > signals.negative ? 'net positive' : signals.negative > signals.positive ? 'net cautious' : 'mixed'}, with ${signals.analystMentions} analyst-linked headlines in the latest feed.`
           : 'Public commentary is light right now, so street consensus is being inferred from price action more than fresh coverage.',
-    masonSummary:
+    aiProvider: 'fallback' as const,
+    aiProviderLabel: 'MehAI says\u2026',
+    aiSummary:
       overallTone === 'bullish'
-        ? `Mason sees constructive structure across the dominant windows, and the live analyst feed currently reinforces that with a ${analystContext.rating ?? 'mixed'} Street posture.`
+        ? `Constructive structure is showing across the dominant windows, and the live analyst feed reinforces that with a ${analystContext.rating ?? 'mixed'} Street posture.`
         : overallTone === 'bearish'
-          ? `Mason sees weak structure across the dominant windows; even with a ${analystContext.rating ?? 'mixed'} Street posture, rallies still look more reactive than trend-changing.`
-          : `Mason sees a balanced tape right now, and the live analyst feed is being treated as a secondary input rather than a decisive signal.`,
+          ? `Weak structure is showing across the dominant windows; even with a ${analystContext.rating ?? 'mixed'} Street posture, rallies look more reactive than trend-changing.`
+          : `The tape is balanced right now, and the analyst feed is being treated as a secondary input rather than a decisive signal.`,
     methodology: [
       'Street view blends live analyst consensus, recent rating actions, and symbol-specific headline tone.',
-      'Mason view blends price trend, volatility, support/resistance, volume shift, and analyst alignment.',
+      'AI take blends price trend, volatility, support/resistance, volume shift, and analyst alignment.',
       'Confidence rises with stronger signal agreement and falls when volatility is elevated or Street disagrees with price structure.',
     ],
     trustNotes: [
@@ -1814,6 +1825,60 @@ router.get('/insight/:symbol', async (req, res) => {
   }
 })
 
+router.get('/ai-insight/:symbol', async (req, res) => {
+  try {
+    const symbol = normalizeSymbol(req.params.symbol)
+    const settings = readSettings()
+    const ttl = settings.aiRefreshSeconds ?? 120
+
+    // Check in-memory cache first
+    const cached = getCachedAiInsight(symbol, ttl)
+    if (cached) {
+      const base = await buildMarketInsight(symbol)
+      return res.json({
+        ...base,
+        aiProvider: cached.provider,
+        aiProviderLabel: cached.label,
+        aiSummary: cached.text,
+      })
+    }
+
+    // Build deterministic base
+    const [insight, intradayChart] = await Promise.all([
+      buildMarketInsight(symbol),
+      fetchChart(symbol, '1d').catch(() => null),
+    ])
+
+    const quoteFromChart = intradayChart ? extractQuoteFromChart(intradayChart, symbol, symbol) : null
+    const currentPrice = quoteFromChart?.price ?? null
+    const changePercent = quoteFromChart?.changePercent ?? null
+
+    const provider = detectAiProvider()
+    let aiText: string | null = null
+
+    if (provider !== 'fallback') {
+      const prompt = buildAiPrompt(symbol, insight.name, insight, currentPrice, changePercent)
+      aiText = await generateAiInsight(prompt)
+    }
+
+    const finalProvider = aiText ? provider : 'fallback'
+    const finalLabel = aiProviderLabel(finalProvider)
+    const finalSummary = aiText ?? insight.aiSummary
+
+    // Cache the AI result
+    setCachedAiInsight(symbol, finalProvider, finalLabel, finalSummary)
+
+    return res.json({
+      ...insight,
+      aiProvider: finalProvider,
+      aiProviderLabel: finalLabel,
+      aiSummary: finalSummary,
+    })
+  } catch {
+    res.status(500).json({ error: 'Failed to build AI insight' })
+  }
+})
+
 router.get('/analyst/:symbol', async (req, res) => {
   try {
     res.json(await buildAnalystFeed(req.params.symbol))
@@ -2100,6 +2165,354 @@ router.delete('/portfolio/:symbol', async (req, res) => {
     res.json({ ok: true })
   } catch {
     res.status(500).json({ error: 'Failed to delete portfolio position' })
+  }
+})
+
+// ─── Sector Constituents ────────────────────────────────────────────────────
+
+const OUR_TO_FMP_SECTOR: Record<string, string> = {
+  Technology: 'Technology',
+  Healthcare: 'Healthcare',
+  Financials: 'Financial Services',
+  'Consumer Discretionary': 'Consumer Cyclical',
+  'Consumer Staples': 'Consumer Defensive',
+  'Communication Services': 'Communication Services',
+  Industrials: 'Industrials',
+  Energy: 'Energy',
+  Materials: 'Basic Materials',
+  'Real Estate': 'Real Estate',
+  Utilities: 'Utilities',
+}
+
+const ETF_NAMES: Record<string, string> = {
+  XLC: 'Communication Services Select Sector SPDR',
+  XLY: 'Consumer Discretionary Select Sector SPDR',
+  XLP: 'Consumer Staples Select Sector SPDR',
+  XLE: 'Energy Select Sector SPDR',
+  XLF: 'Financial Select Sector SPDR',
+  XLV: 'Health Care Select Sector SPDR',
+  XLI: 'Industrial Select Sector SPDR',
+  XLB: 'Materials Select Sector SPDR',
+  XLRE: 'Real Estate Select Sector SPDR',
+  XLK: 'Technology Select Sector SPDR',
+  XLU: 'Utilities Select Sector SPDR',
+}
+
+router.get('/sectors/:etf/constituents', async (req, res) => {
+  const etf = (req.params.etf ?? '').toUpperCase()
+  if (!etf) return res.status(400).json({ error: 'ETF symbol required' })
+
+  try {
+    // Always fetch the ETF quote itself
+    const etfChartData = await fetchChart(etf, '1d').catch(() => null)
+    const etfQuote = etfChartData ? extractQuoteFromChart(etfChartData, etf, ETF_NAMES[etf] ?? etf) : null
+
+    const fmpKey = getAnalystFeedApiKey()
+    let constituents: Array<{
+      symbol: string
+      name: string
+      weight: number
+      price: number | null
+      change: number | null
+      changePercent: number | null
+      marketCap: string | null
+      shares: number | null
+    }> = []
+    let hasFmpData = false
+
+    if (fmpKey) {
+      // FMP path: get ETF holders
+      const { data: holders } = await fetchFmpSafe<Array<{ asset: string; shares: number; weightPercentage: number; name: string }>>(
+        `/api/v3/etf-holder/${encodeURIComponent(etf)}`,
+        { limit: 25 },
+        fmpKey,
+      )
+
+      if (holders && holders.length > 0) {
+        hasFmpData = true
+        const top = holders.slice(0, 20)
+        const symbols = top.map((h) => h.asset).filter(Boolean)
+
+        // Batch fetch quotes for constituents
+        const quoteResults = await Promise.allSettled(symbols.map((s) => fetchChart(s, '1d')))
+
+        constituents = top.map((holder, index) => {
+          const symbol = holder.asset
+          const quoteResult = quoteResults[index]
+          if (!symbol) return null
+
+          let price: number | null = null
+          let change: number | null = null
+          let changePercent: number | null = null
+          let marketCapStr: string | null = null
+
+          if (quoteResult.status === 'fulfilled') {
+            try {
+              const q = extractQuoteFromChart(quoteResult.value, symbol, symbol)
+              price = q.price
+              change = q.change
+              changePercent = q.changePercent
+              const vol = toNumber(q.meta.regularMarketVolume)
+              if (vol && price) marketCapStr = formatMarketCap(price * vol)
+            } catch {
+              // keep nulls
+            }
+          }
+
+          return {
+            symbol,
+            name: holder.name ?? symbol,
+            weight: toNumber(holder.weightPercentage) ?? 0,
+            price,
+            change,
+            changePercent,
+            marketCap: marketCapStr,
+            shares: toNumber(holder.shares),
+          }
+        }).filter((c): c is NonNullable<typeof c> => c !== null)
+      }
+    }
+
+    if (!hasFmpData) {
+      // Yahoo fallback: quoteSummary topHoldings
+      try {
+        const summaryUrl =
+          `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(etf)}` +
+          `?modules=topHoldings`
+        const summaryData = await fetchJson<any>(summaryUrl)
+        const holdings: Array<{ symbol: string; holdingName: string; holdingPercent: { raw: number } }> =
+          summaryData?.quoteSummary?.result?.[0]?.topHoldings?.holdings ?? []
+
+        if (holdings.length > 0) {
+          const symbols = holdings.map((h) => h.symbol).filter(Boolean).slice(0, 15)
+          const quoteResults = await Promise.allSettled(symbols.map((s) => fetchChart(s, '1d')))
+
+          constituents = holdings.slice(0, 15).map((holding, index) => {
+            const symbol = holding.symbol
+            if (!symbol) return null
+
+            const quoteResult = quoteResults[index]
+            let price: number | null = null
+            let change: number | null = null
+            let changePercent: number | null = null
+            let marketCapStr: string | null = null
+
+            if (quoteResult?.status === 'fulfilled') {
+              try {
+                const q = extractQuoteFromChart(quoteResult.value, symbol, symbol)
+                price = q.price
+                change = q.change
+                changePercent = q.changePercent
+                const vol = toNumber(q.meta.regularMarketVolume)
+                if (vol && price) marketCapStr = formatMarketCap(price * vol)
+              } catch {
+                // keep nulls
+              }
+            }
+
+            return {
+              symbol,
+              name: holding.holdingName ?? symbol,
+              weight: (toNumber(holding.holdingPercent?.raw) ?? 0) * 100,
+              price,
+              change,
+              changePercent,
+              marketCap: marketCapStr,
+              shares: null,
+            }
+          }).filter((c): c is NonNullable<typeof c> => c !== null)
+        }
+      } catch {
+        // Yahoo fallback also failed — return empty
+      }
+    }
+
+    res.json({
+      etf,
+      name: etfQuote?.name ?? ETF_NAMES[etf] ?? etf,
+      price: etfQuote?.price ?? 0,
+      change: etfQuote?.change ?? 0,
+      changePercent: etfQuote?.changePercent ?? 0,
+      hasFmpData,
+      constituents,
+    })
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch sector constituents' })
+  }
+})
+
+// ─── Stock Screener ──────────────────────────────────────────────────────────
+
+const screenerCache = new Map<string, { t: number; data: unknown }>()
+const SCREENER_TTL_MS = 60_000
+
+function fmtVolume(v: number | null | undefined): string {
+  if (!v) return '--'
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
+  return String(Math.round(v))
+}
+
+function fmtMktCap(v: number | null | undefined): string {
+  if (!v) return '--'
+  if (v >= 1_000_000_000_000) return `$${(v / 1_000_000_000_000).toFixed(2)}T`
+  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+  return `$${Math.round(v)}`
+}
+
+router.get('/screener', async (req, res) => {
+  const cacheKey = JSON.stringify(req.query)
+  const cached = screenerCache.get(cacheKey)
+  if (cached && Date.now() - cached.t < SCREENER_TTL_MS) {
+    return res.json(cached.data)
+  }
+
+  const sector = typeof req.query.sector === 'string' ? req.query.sector : undefined
+  const minPrice = toNumber(req.query.minPrice as string)
+  const maxPrice = toNumber(req.query.maxPrice as string)
+  const minChange = toNumber(req.query.minChange as string)
+  const maxChange = toNumber(req.query.maxChange as string)
+  const minPe = toNumber(req.query.minPe as string)
+  const maxPe = toNumber(req.query.maxPe as string)
+  const minVolume = toNumber(req.query.minVolume as string)
+  const minMarketCap = toNumber(req.query.minMarketCap as string)
+  const maxMarketCap = toNumber(req.query.maxMarketCap as string)
+  const limit = Math.min(toNumber(req.query.limit as string) ?? 50, 200)
+
+  try {
+    const fmpKey = getAnalystFeedApiKey()
+
+    if (fmpKey) {
+      // FMP screener path
+      const fmpParams: Record<string, string | number | undefined> = {
+        isEtf: 'false',
+        country: 'US',
+        isActivelyTrading: 'true',
+        limit: 200,
+      }
+      if (sector) fmpParams.sector = OUR_TO_FMP_SECTOR[sector] ?? sector
+      if (minPrice !== null) fmpParams.priceMoreThan = minPrice
+      if (maxPrice !== null) fmpParams.priceLowerThan = maxPrice
+      if (minVolume !== null) fmpParams.volumeMoreThan = minVolume
+      if (minMarketCap !== null) fmpParams.marketCapMoreThan = minMarketCap
+      if (maxMarketCap !== null) fmpParams.marketCapLowerThan = maxMarketCap
+
+      const { data: fmpResults } = await fetchFmpSafe<Array<{
+        symbol: string
+        companyName: string
+        marketCap: number
+        sector: string
+        industry: string
+        price: number
+        volume: number
+        exchange: string
+        beta?: number
+      }>>('/api/v3/stock-screener', fmpParams, fmpKey)
+
+      if (fmpResults && Array.isArray(fmpResults)) {
+        let results = fmpResults.map((item) => ({
+          symbol: item.symbol,
+          name: item.companyName ?? item.symbol,
+          sector: item.sector ?? null,
+          price: toNumber(item.price),
+          changePercent: null as number | null,
+          marketCap: toNumber(item.marketCap),
+          marketCapFormatted: fmtMktCap(toNumber(item.marketCap)),
+          peRatio: null as number | null,
+          volume: toNumber(item.volume),
+          volumeFormatted: fmtVolume(toNumber(item.volume)),
+          exchange: item.exchange ?? null,
+        }))
+
+        // Apply in-memory P/E filter (FMP screener doesn't support it natively)
+        // Skip P/E for FMP path since we don't have it — note this limitation
+        if (minChange !== null || maxChange !== null) {
+          // Can't filter by changePercent without extra requests — skip silently
+        }
+
+        results = results.slice(0, limit)
+
+        const response = { hasFmpData: true, total: results.length, results }
+        screenerCache.set(cacheKey, { t: Date.now(), data: response })
+        return res.json(response)
+      }
+    }
+
+    // Yahoo fallback: merge several predefined screeners
+    const screenerIds = ['most_actives', 'day_gainers', 'day_losers', 'growth_technology_stocks', 'undervalued_large_caps']
+    const counts = [50, 25, 25, 25, 25]
+
+    const allResults = await Promise.allSettled(
+      screenerIds.map((id, i) => fetchScreenerQuotes(id, counts[i]))
+    )
+
+    const seen = new Set<string>()
+    const merged: Array<{
+      symbol: string
+      name: string
+      sector: string | null
+      price: number | null
+      changePercent: number | null
+      marketCap: number | null
+      marketCapFormatted: string
+      peRatio: number | null
+      volume: number | null
+      volumeFormatted: string
+      exchange: string | null
+    }> = []
+
+    for (const result of allResults) {
+      if (result.status === 'rejected') continue
+      for (const quote of result.value) {
+        const sym = quote.symbol
+        if (!sym || seen.has(sym)) continue
+        seen.add(sym)
+
+        const price = toNumber(quote.regularMarketPrice)
+        const changePercent = toNumber(quote.regularMarketChangePercent)
+        const mktCap = toNumber(quote.marketCap)
+        const vol = toNumber(quote.regularMarketVolume)
+        const pe = toNumber(quote.trailingPE)
+        const sectorVal: string | null = quote.sector ?? null
+
+        // Apply filters
+        if (sector && sectorVal !== sector) continue
+        if (minPrice !== null && (price === null || price < minPrice)) continue
+        if (maxPrice !== null && (price === null || price > maxPrice)) continue
+        if (minChange !== null && (changePercent === null || changePercent < minChange)) continue
+        if (maxChange !== null && (changePercent === null || changePercent > maxChange)) continue
+        if (minPe !== null && (pe === null || pe < minPe)) continue
+        if (maxPe !== null && (pe === null || pe > maxPe)) continue
+        if (minVolume !== null && (vol === null || vol < minVolume)) continue
+        if (minMarketCap !== null && (mktCap === null || mktCap < minMarketCap)) continue
+        if (maxMarketCap !== null && (mktCap === null || mktCap > maxMarketCap)) continue
+
+        merged.push({
+          symbol: sym,
+          name: quote.longName ?? quote.shortName ?? sym,
+          sector: sectorVal,
+          price,
+          changePercent,
+          marketCap: mktCap,
+          marketCapFormatted: fmtMktCap(mktCap),
+          peRatio: pe,
+          volume: vol,
+          volumeFormatted: fmtVolume(vol),
+          exchange: quote.exchange ?? null,
+        })
+
+        if (merged.length >= limit) break
+      }
+      if (merged.length >= limit) break
+    }
+
+    const response = { hasFmpData: false, total: merged.length, results: merged }
+    screenerCache.set(cacheKey, { t: Date.now(), data: response })
+    res.json(response)
+  } catch {
+    res.status(500).json({ error: 'Failed to run screener' })
   }
 })
 

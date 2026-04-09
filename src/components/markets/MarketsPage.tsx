@@ -3,35 +3,25 @@ import {
   ArrowLeft,
   BarChart3,
   ExternalLink,
-  Pencil,
   Plus,
-  RefreshCw,
-  Trash2,
   TrendingDown,
   TrendingUp,
-  Wallet,
   X,
 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
-import { PageHeader } from '@/components/layout/PageHeader'
 import {
-  useAddPortfolioPosition,
   useAddToWatchlist,
+  useAiInsight,
   useAnalystFeed,
   useGlobalMarkets,
   useMarketChart,
   useMarketCompareCharts,
   useMarketHistory,
   useMarketIndices,
-  useMarketInsight,
   useMarketMovers,
   useMarketNews,
   useMarketQuote,
   useMarketSectors,
-  usePortfolio,
   useRemoveFromWatchlist,
-  useRemovePortfolioPosition,
-  useUpdatePortfolioPosition,
   useWatchlist,
 } from '@/hooks/use-markets'
 import { useSettings } from '@/hooks/use-settings'
@@ -50,7 +40,6 @@ import type {
   MarketNews,
   MarketQuoteDetail,
   MarketTone,
-  PortfolioPosition,
   SectorPerformance,
   WatchlistStock,
 } from '@/types/market'
@@ -77,16 +66,8 @@ const SECTOR_COMPARE_SYMBOLS: Record<string, string> = {
   'Utilities': 'XLU',
 }
 
-type MarketView = 'overview' | 'portfolio'
 type StockDetailTab = 'overview' | 'analyst' | 'insight' | 'history'
 type MarketRegime = 'trend-up' | 'trend-down' | 'range-bound' | 'volatile'
-
-interface PortfolioFormState {
-  symbol: string
-  shares: string
-  costBasis: string
-  dateAdded: string
-}
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -102,15 +83,6 @@ function createDefaultHistoryRange() {
   return {
     startDate: getDateDaysAgo(90),
     endDate: getTodayDate(),
-  }
-}
-
-function createEmptyPortfolioForm(): PortfolioFormState {
-  return {
-    symbol: '',
-    shares: '',
-    costBasis: '',
-    dateAdded: getTodayDate(),
   }
 }
 
@@ -258,7 +230,7 @@ function formatRawNumber(value: number | null | undefined, digits = 2) {
 }
 
 function getToneClasses(tone: MarketTone) {
-  if (tone === 'bullish') return 'border-green-500/30 bg-green-500/10 text-green-300'
+  if (tone === 'bullish') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
   if (tone === 'bearish') return 'border-red-500/30 bg-red-500/10 text-red-300'
   return 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
 }
@@ -281,7 +253,7 @@ function getAnalystActionMeta(action: string | null | undefined) {
   if (normalized.includes('upgrade')) {
     return {
       label: 'Upgrade',
-      className: 'border-green-500/30 bg-green-500/10 text-green-300',
+      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
     }
   }
   if (normalized.includes('downgrade')) {
@@ -321,13 +293,13 @@ function getAnalystRatingTone(rating: string | null | undefined) {
 
 function getAnalystRatingClass(rating: string | null | undefined) {
   const tone = getAnalystRatingTone(rating)
-  if (tone === 'positive') return 'border-green-500/30 bg-green-500/10 text-green-300'
+  if (tone === 'positive') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
   if (tone === 'negative') return 'border-red-500/30 bg-red-500/10 text-red-300'
   return 'border-zinc-700 bg-zinc-800/70 text-zinc-300'
 }
 
 function getAlignmentClass(alignment: 'supportive' | 'mixed' | 'contradictory') {
-  if (alignment === 'supportive') return 'border-green-500/30 bg-green-500/10 text-green-300'
+  if (alignment === 'supportive') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
   if (alignment === 'contradictory') return 'border-red-500/30 bg-red-500/10 text-red-300'
   return 'border-zinc-700 bg-zinc-800/70 text-zinc-300'
 }
@@ -382,7 +354,7 @@ function detectRegime(points: MarketChart['points']) {
 }
 
 function getRegimeClass(regime: MarketRegime) {
-  if (regime === 'trend-up') return 'border-green-500/30 bg-green-500/10 text-green-300'
+  if (regime === 'trend-up') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
   if (regime === 'trend-down') return 'border-red-500/30 bg-red-500/10 text-red-300'
   if (regime === 'volatile') return 'border-amber-500/30 bg-amber-500/10 text-amber-300'
   return 'border-zinc-700 bg-zinc-800/70 text-zinc-300'
@@ -454,7 +426,7 @@ function IndexCard({
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-zinc-400">{index.name}</span>
-        <span className={cn('flex items-center gap-1 text-xs font-medium', positive ? 'text-green-400' : 'text-red-400')}>
+        <span className={cn('flex items-center gap-1 text-xs font-medium', positive ? 'text-emerald-400' : 'text-red-400')}>
           {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
           {fmtPercent(index.changePercent)}
         </span>
@@ -462,7 +434,7 @@ function IndexCard({
       <div className="flex items-end justify-between gap-2">
         <div>
           <div className="text-2xl font-bold leading-none tabular-nums">{fmtPrice(index.price)}</div>
-          <div className={cn('mt-1 text-xs tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+          <div className={cn('mt-1 text-xs tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
             {fmtSignedCurrency(index.change)}
           </div>
         </div>
@@ -521,7 +493,7 @@ function StockCard({
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-xl font-bold leading-none tabular-nums">{fmtCurrency(stock.price)}</div>
-          <div className={cn('mt-1 text-xs font-medium tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+          <div className={cn('mt-1 text-xs font-medium tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
             {fmtChange(stock.change, stock.changePercent)}
           </div>
         </div>
@@ -542,10 +514,10 @@ function SectorCard({ sector }: { sector: SectorPerformance }) {
     <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3">
       <span className="text-sm font-medium text-zinc-300">{sector.name}</span>
       <div className="flex items-center gap-2">
-        <span className={cn('text-sm font-semibold tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+        <span className={cn('text-sm font-semibold tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
           {fmtPercent(sector.changePercent)}
         </span>
-        {positive ? <TrendingUp className="h-4 w-4 text-green-400" /> : <TrendingDown className="h-4 w-4 text-red-400" />}
+        {positive ? <TrendingUp className="h-4 w-4 text-emerald-400" /> : <TrendingDown className="h-4 w-4 text-red-400" />}
       </div>
     </div>
   )
@@ -670,7 +642,7 @@ function ChartPanel({
             <div className="text-3xl font-semibold tabular-nums text-zinc-50">
               {chart ? fmtCurrency(chart.price, chart.currency) : '--'}
             </div>
-            <div className={cn('text-sm font-medium tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+            <div className={cn('text-sm font-medium tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
               {chart ? fmtChange(chart.change, chart.changePercent, chart.currency) : '--'}
             </div>
             {chart?.exchangeName ? <div className="text-sm text-zinc-500">{chart.exchangeName}</div> : null}
@@ -984,7 +956,7 @@ function QuotePanel({
             <div className="text-2xl font-semibold text-zinc-100">{quote.name}</div>
             <div className="mt-1 text-sm text-zinc-500">{quote.exchangeName || symbol}</div>
             <div className="mt-3 text-3xl font-bold tabular-nums text-zinc-50">{fmtCurrency(quote.price, quote.currency)}</div>
-            <div className={cn('mt-1 text-sm font-medium tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+            <div className={cn('mt-1 text-sm font-medium tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
               {fmtChange(quote.change, quote.changePercent, quote.currency)}
             </div>
           </div>
@@ -1222,7 +1194,7 @@ function HistoryPanel({
                       <td
                         className={cn(
                           'px-3 py-3 tabular-nums font-medium',
-                          (point.changePercent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400',
+                          (point.changePercent ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400',
                         )}
                       >
                         {fmtSignedPercent(point.changePercent)}
@@ -1345,7 +1317,7 @@ function AnalystPanel({
     initiations: analystFeed?.latestActions.filter((item) => (item.action ?? '').toLowerCase().includes('init')).length ?? 0,
   }
   const ratingBars = [
-    { label: 'Strong Buy', value: consensus?.strongBuy ?? 0, className: 'bg-green-400' },
+    { label: 'Strong Buy', value: consensus?.strongBuy ?? 0, className: 'bg-emerald-400' },
     { label: 'Buy', value: consensus?.buy ?? 0, className: 'bg-emerald-300' },
     { label: 'Hold', value: consensus?.hold ?? 0, className: 'bg-zinc-400' },
     { label: 'Sell', value: consensus?.sell ?? 0, className: 'bg-amber-300' },
@@ -1410,7 +1382,7 @@ function AnalystPanel({
                     <div
                       className={cn(
                         'rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider',
-                        upsideTone === 'positive' && 'border-green-500/30 bg-green-500/10 text-green-300',
+                        upsideTone === 'positive' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
                         upsideTone === 'negative' && 'border-red-500/30 bg-red-500/10 text-red-300',
                         upsideTone === 'neutral' && 'border-zinc-700 bg-zinc-800/70 text-zinc-300',
                       )}
@@ -1560,7 +1532,7 @@ function AnalystPanel({
                         <div
                           className={cn(
                             'mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider',
-                            deltaPercent !== null && deltaPercent > 0 && 'border-green-500/30 bg-green-500/10 text-green-300',
+                            deltaPercent !== null && deltaPercent > 0 && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
                             deltaPercent !== null && deltaPercent < 0 && 'border-red-500/30 bg-red-500/10 text-red-300',
                             (deltaPercent === null || deltaPercent === 0) && 'border-zinc-700 bg-zinc-800/70 text-zinc-300',
                           )}
@@ -1623,12 +1595,22 @@ function InsightPanel({
 }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-      <div className="text-xs uppercase tracking-wider text-zinc-500">Street View + Mason View</div>
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-zinc-500">Street Says + AI Take</div>
+        {insight && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 px-2.5 py-1 text-xs text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              {insight.aiProviderLabel}
+            </span>
+          </div>
+        )}
+      </div>
       <div className="mt-1 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-lg font-semibold text-zinc-100">Multi-horizon outlook</div>
           <div className="mt-1 text-sm text-zinc-500">
-            This combines real headline tone with a Mason-style read on momentum, volatility, and participation.
+            Combines real headline tone with an AI read on momentum, volatility, and participation.
           </div>
         </div>
 
@@ -1709,8 +1691,11 @@ function InsightPanel({
             </div>
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-              <div className="text-xs uppercase tracking-wider text-zinc-500">Mason Summary</div>
-              <div className="mt-2 text-sm leading-6 text-zinc-200">{insight.masonSummary}</div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-0.5 rounded-full bg-emerald-500" />
+                <div className="text-xs uppercase tracking-wider text-zinc-500">{insight.aiProviderLabel ?? 'MehAI says\u2026'}</div>
+              </div>
+              <div className="mt-2 text-sm leading-6 text-zinc-300">{insight.aiSummary}</div>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-500">
                 <span className="rounded-full border border-zinc-700 px-2 py-1">
                   Support: {fmtCurrency(insight.keyLevels.support)}
@@ -1754,7 +1739,7 @@ function InsightPanel({
                         className={cn(
                           'h-2 rounded-full',
                           horizon.confidenceScore >= 70
-                            ? 'bg-green-400'
+                            ? 'bg-emerald-400'
                             : horizon.confidenceScore >= 55
                               ? 'bg-amber-300'
                               : 'bg-red-400',
@@ -1794,8 +1779,8 @@ function InsightPanel({
                     <p className="mt-1">{horizon.streetView}</p>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-zinc-500">Mason</div>
-                    <p className="mt-1">{horizon.masonView}</p>
+                    <div className="text-xs uppercase tracking-wider text-zinc-500">AI Take</div>
+                    <p className="mt-1">{horizon.aiView}</p>
                   </div>
                 </div>
 
@@ -1865,7 +1850,7 @@ function InsightPanel({
                               <td
                                 className={cn(
                                   'px-3 py-2 text-right font-medium tabular-nums',
-                                  numericValue > 0 ? 'text-green-300' : numericValue < 0 ? 'text-red-300' : 'text-zinc-300',
+                                  numericValue > 0 ? 'text-emerald-400' : numericValue < 0 ? 'text-red-300' : 'text-zinc-300',
                                 )}
                               >
                                 {numericValue >= 0 ? '+' : ''}
@@ -1950,7 +1935,7 @@ function MoversList({
                 </div>
                 <div className="text-right">
                   <div className="font-semibold tabular-nums text-zinc-100">{fmtCurrency(item.price)}</div>
-                  <div className={cn('text-xs font-medium tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+                  <div className={cn('text-xs font-medium tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
                     {fmtChange(item.change, item.changePercent)}
                   </div>
                 </div>
@@ -1988,12 +1973,12 @@ function GlobalAssetCard({
           <div className="text-sm font-semibold text-zinc-100">{asset.name}</div>
           <div className="text-xs text-zinc-500">{asset.symbol}</div>
         </div>
-        <div className={cn('text-xs font-medium', positive ? 'text-green-400' : 'text-red-400')}>{fmtPercent(asset.changePercent)}</div>
+        <div className={cn('text-xs font-medium', positive ? 'text-emerald-400' : 'text-red-400')}>{fmtPercent(asset.changePercent)}</div>
       </div>
       <div className="mt-4 flex items-end justify-between gap-3">
         <div>
           <div className="text-lg font-semibold tabular-nums text-zinc-100">{fmtCurrency(asset.price)}</div>
-          <div className={cn('mt-1 text-xs font-medium tabular-nums', positive ? 'text-green-400' : 'text-red-400')}>
+          <div className={cn('mt-1 text-xs font-medium tabular-nums', positive ? 'text-emerald-400' : 'text-red-400')}>
             {fmtSignedCurrency(asset.change)}
           </div>
         </div>
@@ -2018,7 +2003,7 @@ function SummaryCard({
       <div
         className={cn(
           'mt-2 text-2xl font-semibold tabular-nums',
-          tone === 'positive' && 'text-green-400',
+          tone === 'positive' && 'text-emerald-400',
           tone === 'negative' && 'text-red-400',
           tone === 'neutral' && 'text-zinc-100',
         )}
@@ -2030,10 +2015,8 @@ function SummaryCard({
 }
 
 export function MarketsPage() {
-  const queryClient = useQueryClient()
   const settingsQuery = useSettings()
   const defaultHistoryRange = createDefaultHistoryRange()
-  const [activeView, setActiveView] = useState<MarketView>('overview')
   const [tickerInput, setTickerInput] = useState('')
   const [workspaceSymbolInput, setWorkspaceSymbolInput] = useState('')
   const [compareSymbolInput, setCompareSymbolInput] = useState('')
@@ -2046,9 +2029,6 @@ export function MarketsPage() {
   const [historyStartDate, setHistoryStartDate] = useState(defaultHistoryRange.startDate)
   const [historyEndDate, setHistoryEndDate] = useState(defaultHistoryRange.endDate)
   const [historyInterval, setHistoryInterval] = useState<HistoricalInterval>('1d')
-  const [portfolioForm, setPortfolioForm] = useState<PortfolioFormState>(createEmptyPortfolioForm())
-  const [editingSymbol, setEditingSymbol] = useState<string | null>(null)
-  const [portfolioError, setPortfolioError] = useState('')
 
   const indicesQuery = useMarketIndices()
   const watchlistQuery = useWatchlist()
@@ -2056,7 +2036,6 @@ export function MarketsPage() {
   const sectorsQuery = useMarketSectors()
   const moversQuery = useMarketMovers()
   const globalMarketsQuery = useGlobalMarkets()
-  const portfolioQuery = usePortfolio()
   const chartQuery = useMarketChart(selectedSymbol, selectedRange)
   const quoteQuery = useMarketQuote(selectedSymbol)
   const historyQuery = useMarketHistory(selectedSymbol, {
@@ -2064,16 +2043,13 @@ export function MarketsPage() {
     endDate: historyEndDate,
     interval: historyInterval,
   })
-  const insightQuery = useMarketInsight(selectedSymbol)
+  const insightQuery = useAiInsight(selectedSymbol, settingsQuery.data?.aiRefreshSeconds)
   const analystFeedQuery = useAnalystFeed(selectedSymbol)
   const compareChartQueries = useMarketCompareCharts(compareSymbols, selectedRange)
   const chartStyle = settingsQuery.data?.marketPreferences.chartStyle ?? 'area'
 
   const addMutation = useAddToWatchlist()
   const removeMutation = useRemoveFromWatchlist()
-  const addPositionMutation = useAddPortfolioPosition()
-  const updatePositionMutation = useUpdatePortfolioPosition()
-  const removePositionMutation = useRemovePortfolioPosition()
 
   const anyQueryLoading =
     indicesQuery.isLoading ||
@@ -2082,7 +2058,6 @@ export function MarketsPage() {
     sectorsQuery.isLoading ||
     moversQuery.isLoading ||
     globalMarketsQuery.isLoading ||
-    portfolioQuery.isLoading ||
     chartQuery.isLoading ||
     quoteQuery.isLoading ||
     historyQuery.isLoading ||
@@ -2090,12 +2065,7 @@ export function MarketsPage() {
     analystFeedQuery.isLoading ||
     settingsQuery.isLoading
 
-  const anyMutationPending =
-    addMutation.isPending ||
-    removeMutation.isPending ||
-    addPositionMutation.isPending ||
-    updatePositionMutation.isPending ||
-    removePositionMutation.isPending
+  const anyMutationPending = addMutation.isPending || removeMutation.isPending
 
   const globalGroups: Record<string, GlobalMarketAsset[]> = {
     Crypto: [],
@@ -2122,14 +2092,9 @@ export function MarketsPage() {
     .filter((chart): chart is MarketChart => Boolean(chart))
   const comparePresets = getComparePresets(selectedSymbol, quoteQuery.data?.sector, compareSymbols).slice(0, 4)
 
-  function refresh() {
-    queryClient.invalidateQueries({ queryKey: ['markets'] })
-  }
-
   function handleSelectSymbol(symbol: string) {
     setSelectedSymbol(symbol)
     setDetailTab('overview')
-    setActiveView('overview')
   }
 
   function handleCloseSymbolDetail() {
@@ -2231,93 +2196,6 @@ export function MarketsPage() {
     removeMutation.mutate(symbol)
   }
 
-  function resetPortfolioForm() {
-    setPortfolioForm(createEmptyPortfolioForm())
-    setEditingSymbol(null)
-    setPortfolioError('')
-  }
-
-  function handleEditPosition(position: PortfolioPosition) {
-    setActiveView('portfolio')
-    setEditingSymbol(position.symbol)
-    setPortfolioError('')
-    setPortfolioForm({
-      symbol: position.symbol,
-      shares: String(position.shares),
-      costBasis: String(position.costBasis),
-      dateAdded: position.dateAdded,
-    })
-  }
-
-  function handleDeletePosition(symbol: string) {
-    setPortfolioError('')
-    removePositionMutation.mutate(symbol, {
-      onError: () => setPortfolioError('Could not remove that position.'),
-      onSuccess: () => {
-        if (editingSymbol === symbol) {
-          resetPortfolioForm()
-        }
-      },
-    })
-  }
-
-  function handleSubmitPosition(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    const symbol = portfolioForm.symbol.trim().toUpperCase()
-    const shares = Number(portfolioForm.shares)
-    const costBasis = Number(portfolioForm.costBasis)
-    const dateAdded = portfolioForm.dateAdded
-
-    if (!symbol) {
-      setPortfolioError('Symbol is required.')
-      return
-    }
-
-    if (!Number.isFinite(shares) || shares <= 0) {
-      setPortfolioError('Shares must be greater than zero.')
-      return
-    }
-
-    if (!Number.isFinite(costBasis) || costBasis < 0) {
-      setPortfolioError('Cost basis must be zero or greater.')
-      return
-    }
-
-    if (!dateAdded) {
-      setPortfolioError('Date added is required.')
-      return
-    }
-
-    setPortfolioError('')
-
-    const payload = {
-      symbol,
-      shares,
-      costBasis,
-      dateAdded,
-    }
-
-    if (editingSymbol) {
-      updatePositionMutation.mutate(
-        { symbol: editingSymbol, position: payload },
-        {
-          onError: () => setPortfolioError('Could not update the portfolio position.'),
-          onSuccess: () => resetPortfolioForm(),
-        },
-      )
-      return
-    }
-
-    addPositionMutation.mutate(payload, {
-      onError: () => setPortfolioError('Could not add the portfolio position.'),
-      onSuccess: () => resetPortfolioForm(),
-    })
-  }
-
-  const portfolioTotals = portfolioQuery.data?.totals
-  const totalPlTone =
-    (portfolioTotals?.totalPlDollar ?? 0) > 0 ? 'positive' : (portfolioTotals?.totalPlDollar ?? 0) < 0 ? 'negative' : 'neutral'
   const isHistoryDateRangeValid = historyStartDate <= historyEndDate
 
   useEffect(() => {
@@ -2334,47 +2212,12 @@ export function MarketsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <PageHeader title="Markets" subtitle="Daily Market Report" />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-xl border border-zinc-700 bg-zinc-900/70 p-1">
-            <button
-              type="button"
-              onClick={() => setActiveView('overview')}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                activeView === 'overview' ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:text-zinc-200',
-              )}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView('portfolio')}
-              className={cn(
-                'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                activeView === 'portfolio' ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:text-zinc-200',
-              )}
-            >
-              <Wallet className="h-3.5 w-3.5" />
-              Portfolio
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={refresh}
-            className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-700"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', (anyQueryLoading || anyMutationPending) && 'animate-spin')} />
-            Refresh
-          </button>
-        </div>
+      <div>
+        <div className="text-xs uppercase tracking-wider text-zinc-500">MarketMeh</div>
+        <h1 className="mt-1 text-2xl font-semibold text-zinc-100">Dashboard</h1>
       </div>
 
-      {activeView === 'overview' ? (
-        selectedSymbol ? (
+      {selectedSymbol ? (
           <section className="space-y-6">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -2429,7 +2272,7 @@ export function MarketsPage() {
                     {([
                       ['overview', 'Overview'],
                       ['analyst', 'Analyst'],
-                      ['insight', 'Street + Mason'],
+                      ['insight', 'Street + AI'],
                       ['history', 'History'],
                     ] as Array<[StockDetailTab, string]>).map(([tabKey, label]) => (
                       <button
@@ -2775,227 +2618,7 @@ export function MarketsPage() {
             </div>
           </>
         )
-      ) : (
-        <section className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Total Value" value={fmtCurrency(portfolioTotals?.totalMarketValue)} />
-            <SummaryCard label="Total Cost" value={fmtCurrency(portfolioTotals?.totalCost)} />
-            <SummaryCard
-              label="Total P&L"
-              value={
-                portfolioTotals
-                  ? `${fmtSignedCurrency(portfolioTotals.totalPlDollar)} (${fmtPercent(portfolioTotals.totalPlPercent)})`
-                  : '--'
-              }
-              tone={totalPlTone}
-            />
-            <SummaryCard
-              label="Positions"
-              value={String(portfolioQuery.data?.positions.length ?? 0)}
-              tone="neutral"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-              <div className="text-xs uppercase tracking-wider text-zinc-500">{editingSymbol ? 'Edit Position' : 'Add Position'}</div>
-              <div className="mt-1 text-lg font-semibold text-zinc-100">
-                {editingSymbol ? `Update ${editingSymbol}` : 'Track a new holding'}
-              </div>
-
-              <form className="mt-4 space-y-3" onSubmit={handleSubmitPosition}>
-                <div>
-                  <label htmlFor="portfolio-symbol" className="mb-1 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                    Symbol
-                  </label>
-                  <input
-                    id="portfolio-symbol"
-                    type="text"
-                    value={portfolioForm.symbol}
-                    onChange={(event) =>
-                      setPortfolioForm((current) => ({
-                        ...current,
-                        symbol: event.target.value.toUpperCase(),
-                      }))
-                    }
-                    placeholder="AAPL"
-                    className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="portfolio-shares" className="mb-1 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                      Shares
-                    </label>
-                    <input
-                      id="portfolio-shares"
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={portfolioForm.shares}
-                      onChange={(event) =>
-                        setPortfolioForm((current) => ({
-                          ...current,
-                          shares: event.target.value,
-                        }))
-                      }
-                      placeholder="10"
-                      className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="portfolio-cost" className="mb-1 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                      Cost Basis
-                    </label>
-                    <input
-                      id="portfolio-cost"
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={portfolioForm.costBasis}
-                      onChange={(event) =>
-                        setPortfolioForm((current) => ({
-                          ...current,
-                          costBasis: event.target.value,
-                        }))
-                      }
-                      placeholder="182.50"
-                      className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="portfolio-date" className="mb-1 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                    Date Added
-                  </label>
-                  <input
-                    id="portfolio-date"
-                    type="date"
-                    value={portfolioForm.dateAdded}
-                    onChange={(event) =>
-                      setPortfolioForm((current) => ({
-                        ...current,
-                        dateAdded: event.target.value,
-                      }))
-                    }
-                    className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
-                  />
-                </div>
-
-                {portfolioError ? <p className="text-sm text-red-400">{portfolioError}</p> : null}
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={addPositionMutation.isPending || updatePositionMutation.isPending}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
-                  >
-                    {editingSymbol ? 'Update Position' : 'Add Position'}
-                  </button>
-
-                  {editingSymbol ? (
-                    <button
-                      type="button"
-                      onClick={resetPortfolioForm}
-                      className="rounded-lg border border-zinc-700 bg-zinc-950/60 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
-                    >
-                      Cancel
-                    </button>
-                  ) : null}
-                </div>
-              </form>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-zinc-500">Positions</div>
-                  <div className="mt-1 text-lg font-semibold text-zinc-100">Portfolio Holdings</div>
-                </div>
-                <div className="text-sm text-zinc-500">{portfolioQuery.data?.positions.length ?? 0} tracked</div>
-              </div>
-
-              <div className="mt-4 overflow-x-auto">
-                {portfolioQuery.isLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, index) => (
-                      <div key={index} className="h-14 animate-pulse rounded-xl bg-zinc-950/70" />
-                    ))}
-                  </div>
-                ) : (portfolioQuery.data?.positions.length ?? 0) > 0 ? (
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wider text-zinc-500">
-                      <tr className="border-b border-zinc-800">
-                        <th className="pb-3 pr-4 font-medium">Symbol</th>
-                        <th className="pb-3 pr-4 font-medium">Shares</th>
-                        <th className="pb-3 pr-4 font-medium">Cost</th>
-                        <th className="pb-3 pr-4 font-medium">Current</th>
-                        <th className="pb-3 pr-4 font-medium">Value</th>
-                        <th className="pb-3 pr-4 font-medium">P&amp;L</th>
-                        <th className="pb-3 pr-4 font-medium">Date</th>
-                        <th className="pb-3 text-right font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(portfolioQuery.data?.positions ?? []).map((position) => {
-                        const positive = position.plDollar >= 0
-                        return (
-                          <tr key={position.symbol} className="border-b border-zinc-800/70">
-                            <td className="py-3 pr-4">
-                              <button
-                                type="button"
-                                onClick={() => handleSelectSymbol(position.symbol)}
-                                className="text-left transition-colors hover:text-blue-300"
-                              >
-                                <div className="font-semibold text-zinc-100">{position.symbol}</div>
-                                <div className="text-xs text-zinc-500">{position.name}</div>
-                              </button>
-                            </td>
-                            <td className="py-3 pr-4 tabular-nums text-zinc-300">{fmtNumber(position.shares, 2)}</td>
-                            <td className="py-3 pr-4 tabular-nums text-zinc-300">{fmtCurrency(position.costBasis)}</td>
-                            <td className="py-3 pr-4 tabular-nums text-zinc-300">{fmtCurrency(position.currentPrice)}</td>
-                            <td className="py-3 pr-4 tabular-nums text-zinc-100">{fmtCurrency(position.marketValue)}</td>
-                            <td className={cn('py-3 pr-4 tabular-nums font-medium', positive ? 'text-green-400' : 'text-red-400')}>
-                              <div>{fmtSignedCurrency(position.plDollar)}</div>
-                              <div className="text-xs">{fmtPercent(position.plPercent)}</div>
-                            </td>
-                            <td className="py-3 pr-4 text-zinc-400">{position.dateAdded}</td>
-                            <td className="py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditPosition(position)}
-                                  className="rounded-lg border border-zinc-700 p-2 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100"
-                                  aria-label={`Edit ${position.symbol}`}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePosition(position.symbol)}
-                                  className="rounded-lg border border-zinc-700 p-2 text-zinc-400 transition-colors hover:border-red-500/50 hover:text-red-300"
-                                  aria-label={`Delete ${position.symbol}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <EmptyState title="No portfolio positions yet" detail="Add a holding to start tracking market value and performance." />
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      }
     </div>
   )
 }

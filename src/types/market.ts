@@ -209,7 +209,7 @@ export interface MarketInsightHorizon {
   support: number | null
   resistance: number | null
   streetView: string
-  masonView: string
+  aiView: string
   drivers: string[]
   risks: string[]
   scoreBreakdown: {
@@ -236,8 +236,10 @@ export interface MarketInsightResponse {
     analystDataTime: number | null
     headlineCount: number
   }
+  aiProvider: 'claude' | 'openai' | 'fallback'
+  aiProviderLabel: string
   streetSummary: string
-  masonSummary: string
+  aiSummary: string
   methodology: string[]
   trustNotes: string[]
   signals: MarketInsightSignal
@@ -311,4 +313,59 @@ export interface AnalystFeedResponse {
   gradesConsensus: AnalystConsensusCounts | null
   latestActions: AnalystActionItem[]
   historicalActions: AnalystActionItem[]
+}
+
+export interface SectorConstituent {
+  symbol: string
+  name: string
+  weight: number
+  price: number | null
+  change: number | null
+  changePercent: number | null
+  marketCap: string | null
+  shares: number | null
+}
+
+export interface SectorDetailResponse {
+  etf: string
+  name: string
+  price: number
+  change: number
+  changePercent: number
+  hasFmpData: boolean
+  constituents: SectorConstituent[]
+}
+
+export interface ScreenerResult {
+  symbol: string
+  name: string
+  sector: string | null
+  price: number | null
+  changePercent: number | null
+  marketCap: number | null
+  marketCapFormatted: string
+  peRatio: number | null
+  volume: number | null
+  volumeFormatted: string
+  exchange: string | null
+}
+
+export interface ScreenerFilters {
+  sector?: string
+  minPrice?: number
+  maxPrice?: number
+  minChange?: number
+  maxChange?: number
+  minPe?: number
+  maxPe?: number
+  minVolume?: number
+  minMarketCap?: number
+  maxMarketCap?: number
+  limit?: number
+}
+
+export interface ScreenerResponse {
+  hasFmpData: boolean
+  total: number
+  results: ScreenerResult[]
 }

@@ -32,6 +32,18 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0a0a;
+  color: #fafafa;
+}
+
+/* Numeric columns always use tabular-nums */
+td, .tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smooth scrolling for page transitions */
+html {
+  scroll-behavior: smooth;
 }
 
 * {

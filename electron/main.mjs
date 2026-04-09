@@ -45,9 +45,10 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'Markets',
+    title: 'MarketMeh',
     backgroundColor: '#0a0a0a',
     titleBarStyle: 'hiddenInset',
+    icon: path.join(__dirname, '..', 'resources', 'icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

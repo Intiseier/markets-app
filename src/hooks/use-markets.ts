@@ -14,7 +14,10 @@ import type {
   HistoricalInterval,
   PortfolioPositionInput,
   PortfolioResponse,
+  SectorDetailResponse,
   SectorPerformance,
+  ScreenerFilters,
+  ScreenerResponse,
   WatchlistStock,
 } from '@/types/market'
 
@@ -128,6 +131,17 @@ export function useMarketInsight(symbol: string | null | undefined) {
   })
 }
 
+export function useAiInsight(symbol: string | null | undefined, refreshSeconds?: number) {
+  const interval = (refreshSeconds ?? 120) * 1000
+  return useQuery<MarketInsightResponse>({
+    queryKey: ['markets', 'ai-insight', symbol],
+    queryFn: () => apiFetch(`/markets/ai-insight/${encodeURIComponent(symbol ?? '')}`),
+    enabled: Boolean(symbol),
+    refetchInterval: interval,
+    staleTime: interval / 2,
+  })
+}
+
 export function useAnalystFeed(symbol: string | null | undefined) {
   return useQuery<AnalystFeedResponse>({
     queryKey: ['markets', 'analyst-feed', symbol],
@@ -187,5 +201,38 @@ export function useRemovePortfolioPosition() {
   return useMutation({
     mutationFn: (symbol: string) => apiDelete(`/markets/portfolio/${encodeURIComponent(symbol)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['markets', 'portfolio'] }),
+  })
+}
+
+export function useSectorConstituents(etf: string | null | undefined) {
+  return useQuery<SectorDetailResponse>({
+    queryKey: ['markets', 'sector-constituents', etf],
+    queryFn: () => apiFetch(`/markets/sectors/${encodeURIComponent(etf ?? '')}/constituents`),
+    enabled: Boolean(etf),
+    refetchInterval: 5 * 60_000,
+    staleTime: 2 * 60_000,
+  })
+}
+
+export function useScreener(filters: ScreenerFilters) {
+  const params = new URLSearchParams()
+  if (filters.sector) params.set('sector', filters.sector)
+  if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice))
+  if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice))
+  if (filters.minChange !== undefined) params.set('minChange', String(filters.minChange))
+  if (filters.maxChange !== undefined) params.set('maxChange', String(filters.maxChange))
+  if (filters.minPe !== undefined) params.set('minPe', String(filters.minPe))
+  if (filters.maxPe !== undefined) params.set('maxPe', String(filters.maxPe))
+  if (filters.minVolume !== undefined) params.set('minVolume', String(filters.minVolume))
+  if (filters.minMarketCap !== undefined) params.set('minMarketCap', String(filters.minMarketCap))
+  if (filters.maxMarketCap !== undefined) params.set('maxMarketCap', String(filters.maxMarketCap))
+  if (filters.limit !== undefined) params.set('limit', String(filters.limit))
+  const queryString = params.toString()
+
+  return useQuery<ScreenerResponse>({
+    queryKey: ['markets', 'screener', queryString],
+    queryFn: () => apiFetch(`/markets/screener${queryString ? `?${queryString}` : ''}`),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   })
 }
