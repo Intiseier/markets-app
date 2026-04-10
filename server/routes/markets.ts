@@ -378,6 +378,7 @@ async function fetchScreenerQuotes(scrId: string, count: number) {
   return (data?.finance?.result?.[0]?.quotes ?? []) as any[]
 }
 
+
 async function fetchTimeseriesValue(symbol: string, type: string): Promise<number | null> {
   const now = Math.floor(Date.now() / 1000)
   const url =
@@ -2274,56 +2275,52 @@ router.get('/sectors/:etf/constituents', async (req, res) => {
     }
 
     if (!hasFmpData) {
-      // Yahoo fallback: quoteSummary topHoldings
-      try {
-        const summaryUrl =
-          `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(etf)}` +
-          `?modules=topHoldings`
-        const summaryData = await fetchJson<any>(summaryUrl)
-        const holdings: Array<{ symbol: string; holdingName: string; holdingPercent: { raw: number } }> =
-          summaryData?.quoteSummary?.result?.[0]?.topHoldings?.holdings ?? []
+      // Fallback: use sector-specific Yahoo Finance screener for top holdings by market cap
+      const ETF_SECTOR_SCREENER: Record<string, string> = {
+        XLC: 'ms_communication_services',
+        XLY: 'ms_consumer_cyclical',
+        XLP: 'ms_consumer_defensive',
+        XLE: 'ms_energy',
+        XLF: 'ms_financial_services',
+        XLV: 'ms_healthcare',
+        XLI: 'ms_industrials',
+        XLB: 'ms_basic_materials',
+        XLRE: 'ms_real_estate',
+        XLK: 'ms_technology',
+        XLU: 'ms_utilities',
+      }
 
-        if (holdings.length > 0) {
-          const symbols = holdings.map((h) => h.symbol).filter(Boolean).slice(0, 15)
-          const quoteResults = await Promise.allSettled(symbols.map((s) => fetchChart(s, '1d')))
+      const scrId = ETF_SECTOR_SCREENER[etf]
+      if (scrId) {
+        try {
+          const quotes = await fetchScreenerQuotes(scrId, 20)
+          const top = quotes.slice(0, 20)
 
-          constituents = holdings.slice(0, 15).map((holding, index) => {
-            const symbol = holding.symbol
+          // Compute implied weight from market cap proportions
+          const totalMktCap = top.reduce((sum: number, q: any) => sum + (toNumber(q.marketCap) ?? 0), 0)
+
+          constituents = top.map((q: any) => {
+            const symbol = q.symbol
             if (!symbol) return null
-
-            const quoteResult = quoteResults[index]
-            let price: number | null = null
-            let change: number | null = null
-            let changePercent: number | null = null
-            let marketCapStr: string | null = null
-
-            if (quoteResult?.status === 'fulfilled') {
-              try {
-                const q = extractQuoteFromChart(quoteResult.value, symbol, symbol)
-                price = q.price
-                change = q.change
-                changePercent = q.changePercent
-                const vol = toNumber(q.meta.regularMarketVolume)
-                if (vol && price) marketCapStr = formatMarketCap(price * vol)
-              } catch {
-                // keep nulls
-              }
-            }
-
+            const price = toNumber(q.regularMarketPrice)
+            const change = toNumber(q.regularMarketChange)
+            const changePercent = toNumber(q.regularMarketChangePercent)
+            const mktCap = toNumber(q.marketCap)
+            const impliedWeight = totalMktCap > 0 && mktCap ? (mktCap / totalMktCap) * 100 : 0
             return {
               symbol,
-              name: holding.holdingName ?? symbol,
-              weight: (toNumber(holding.holdingPercent?.raw) ?? 0) * 100,
+              name: q.longName ?? q.shortName ?? symbol,
+              weight: impliedWeight,
               price,
               change,
               changePercent,
-              marketCap: marketCapStr,
+              marketCap: formatMarketCap(mktCap),
               shares: null,
             }
           }).filter((c): c is NonNullable<typeof c> => c !== null)
+        } catch {
+          // screener fallback failed — return empty
         }
-      } catch {
-        // Yahoo fallback also failed — return empty
       }
     }
 
@@ -2440,15 +2437,44 @@ router.get('/screener', async (req, res) => {
       }
     }
 
-    // Yahoo fallback: merge several predefined screeners
-    const screenerIds = ['most_actives', 'day_gainers', 'day_losers', 'growth_technology_stocks', 'undervalued_large_caps']
-    const counts = [50, 25, 25, 25, 25]
+    // Yahoo Finance predefined screener IDs mapped per sector
+    const SECTOR_SCREENER_MAP: Record<string, string> = {
+      'Technology': 'ms_technology',
+      'Healthcare': 'ms_healthcare',
+      'Financials': 'ms_financial_services',
+      'Consumer Discretionary': 'ms_consumer_cyclical',
+      'Consumer Staples': 'ms_consumer_defensive',
+      'Communication Services': 'ms_communication_services',
+      'Industrials': 'ms_industrials',
+      'Energy': 'ms_energy',
+      'Materials': 'ms_basic_materials',
+      'Real Estate': 'ms_real_estate',
+      'Utilities': 'ms_utilities',
+    }
+
+    // When a sector filter is active, use the sector-specific Yahoo Finance screener.
+    // Otherwise merge several predefined screeners for a broad overview.
+    const screenerIds = sector && SECTOR_SCREENER_MAP[sector]
+      ? [SECTOR_SCREENER_MAP[sector]]
+      : ['most_actives', 'day_gainers', 'day_losers', 'growth_technology_stocks', 'undervalued_large_caps']
+    const counts = screenerIds.map(() => Math.ceil(limit / screenerIds.length) + 10)
 
     const allResults = await Promise.allSettled(
       screenerIds.map((id, i) => fetchScreenerQuotes(id, counts[i]))
     )
 
+    const rawQuotes: any[] = []
     const seen = new Set<string>()
+    for (const result of allResults) {
+      if (result.status === 'rejected') continue
+      for (const quote of result.value) {
+        const sym = quote.symbol
+        if (!sym || seen.has(sym)) continue
+        seen.add(sym)
+        rawQuotes.push(quote)
+      }
+    }
+
     const merged: Array<{
       symbol: string
       name: string
@@ -2463,48 +2489,42 @@ router.get('/screener', async (req, res) => {
       exchange: string | null
     }> = []
 
-    for (const result of allResults) {
-      if (result.status === 'rejected') continue
-      for (const quote of result.value) {
-        const sym = quote.symbol
-        if (!sym || seen.has(sym)) continue
-        seen.add(sym)
+    for (const quote of rawQuotes) {
+      const sym = quote.symbol
 
-        const price = toNumber(quote.regularMarketPrice)
-        const changePercent = toNumber(quote.regularMarketChangePercent)
-        const mktCap = toNumber(quote.marketCap)
-        const vol = toNumber(quote.regularMarketVolume)
-        const pe = toNumber(quote.trailingPE)
-        const sectorVal: string | null = quote.sector ?? null
+      const price = toNumber(quote.regularMarketPrice)
+      const changePercent = toNumber(quote.regularMarketChangePercent)
+      const mktCap = toNumber(quote.marketCap)
+      const vol = toNumber(quote.regularMarketVolume)
+      const pe = toNumber(quote.trailingPE)
+      // Sector-specific screeners are already filtered; for mixed screeners sector is null
+      const sectorVal: string | null = sector || null
 
-        // Apply filters
-        if (sector && sectorVal !== sector) continue
-        if (minPrice !== null && (price === null || price < minPrice)) continue
-        if (maxPrice !== null && (price === null || price > maxPrice)) continue
-        if (minChange !== null && (changePercent === null || changePercent < minChange)) continue
-        if (maxChange !== null && (changePercent === null || changePercent > maxChange)) continue
-        if (minPe !== null && (pe === null || pe < minPe)) continue
-        if (maxPe !== null && (pe === null || pe > maxPe)) continue
-        if (minVolume !== null && (vol === null || vol < minVolume)) continue
-        if (minMarketCap !== null && (mktCap === null || mktCap < minMarketCap)) continue
-        if (maxMarketCap !== null && (mktCap === null || mktCap > maxMarketCap)) continue
+      // Apply numeric filters
+      if (minPrice !== null && (price === null || price < minPrice)) continue
+      if (maxPrice !== null && (price === null || price > maxPrice)) continue
+      if (minChange !== null && (changePercent === null || changePercent < minChange)) continue
+      if (maxChange !== null && (changePercent === null || changePercent > maxChange)) continue
+      if (minPe !== null && (pe === null || pe < minPe)) continue
+      if (maxPe !== null && (pe === null || pe > maxPe)) continue
+      if (minVolume !== null && (vol === null || vol < minVolume)) continue
+      if (minMarketCap !== null && (mktCap === null || mktCap < minMarketCap)) continue
+      if (maxMarketCap !== null && (mktCap === null || mktCap > maxMarketCap)) continue
 
-        merged.push({
-          symbol: sym,
-          name: quote.longName ?? quote.shortName ?? sym,
-          sector: sectorVal,
-          price,
-          changePercent,
-          marketCap: mktCap,
-          marketCapFormatted: fmtMktCap(mktCap),
-          peRatio: pe,
-          volume: vol,
-          volumeFormatted: fmtVolume(vol),
-          exchange: quote.exchange ?? null,
-        })
+      merged.push({
+        symbol: sym,
+        name: quote.longName ?? quote.shortName ?? sym,
+        sector: sectorVal,
+        price,
+        changePercent,
+        marketCap: mktCap,
+        marketCapFormatted: fmtMktCap(mktCap),
+        peRatio: pe,
+        volume: vol,
+        volumeFormatted: fmtVolume(vol),
+        exchange: quote.exchange ?? null,
+      })
 
-        if (merged.length >= limit) break
-      }
       if (merged.length >= limit) break
     }
 

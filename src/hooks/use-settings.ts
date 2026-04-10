@@ -24,6 +24,9 @@ export interface SettingsData {
   }
   marketPreferences: {
     chartStyle: MarketChartStyle
+    defaultSma20: boolean
+    defaultSma50: boolean
+    defaultVolume: boolean
   }
   cronJobs: unknown[]
 }
@@ -36,10 +39,17 @@ export function useSettings() {
   })
 }
 
+export type MarketPreferencesPatch = Partial<{
+  chartStyle: MarketChartStyle
+  defaultSma20: boolean
+  defaultSma50: boolean
+  defaultVolume: boolean
+}>
+
 export function useSaveMarketPreferences() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (chartStyle: MarketChartStyle) => apiPut('/settings/market-preferences', { chartStyle }),
+    mutationFn: (prefs: MarketPreferencesPatch) => apiPut('/settings/market-preferences', prefs),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 }

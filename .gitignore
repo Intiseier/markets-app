@@ -8,3 +8,4 @@ resources/server.cjs
 *.local
 .DS_Store
 Thumbs.db
+server/data/*.json

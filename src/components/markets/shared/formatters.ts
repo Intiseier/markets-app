@@ -139,15 +139,15 @@ export function getAnalystRatingTone(rating: string | null | undefined) {
 
 export function getAnalystRatingClass(rating: string | null | undefined) {
   const tone = getAnalystRatingTone(rating)
-  if (tone === 'positive') return 'text-emerald-400'
-  if (tone === 'negative') return 'text-red-400'
-  return 'text-zinc-400'
+  if (tone === 'positive') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+  if (tone === 'negative') return 'border-red-500/30 bg-red-500/10 text-red-300'
+  return 'border-zinc-700 bg-zinc-800/70 text-zinc-300'
 }
 
 export function getAlignmentClass(alignment: 'supportive' | 'mixed' | 'contradictory') {
-  if (alignment === 'supportive') return 'text-emerald-400'
-  if (alignment === 'contradictory') return 'text-red-400'
-  return 'text-zinc-400'
+  if (alignment === 'supportive') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+  if (alignment === 'contradictory') return 'border-red-500/30 bg-red-500/10 text-red-300'
+  return 'border-zinc-700 bg-zinc-800/70 text-zinc-300'
 }
 
 export function getTodayDate() {

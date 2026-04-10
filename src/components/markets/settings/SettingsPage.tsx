@@ -273,7 +273,7 @@ export function SettingsPage() {
                 <button
                   key={style}
                   type="button"
-                  onClick={() => savePreferences.mutate(style)}
+                  onClick={() => savePreferences.mutate({ chartStyle: style })}
                   className={cn(
                     'rounded-lg border px-3 py-1.5 text-sm capitalize transition-colors',
                     settings?.marketPreferences.chartStyle === style
@@ -284,6 +284,43 @@ export function SettingsPage() {
                   {style}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Default chart overlays */}
+          <div>
+            <div className="text-sm font-medium text-zinc-200 mb-3">Default Chart Overlays</div>
+            <div className="flex flex-col gap-3">
+              {(
+                [
+                  { key: 'defaultSma20', label: 'SMA 20', description: 'Amber 20-period moving average' },
+                  { key: 'defaultSma50', label: 'SMA 50', description: 'Sky-blue 50-period moving average' },
+                  { key: 'defaultVolume', label: 'Volume Bars', description: 'Volume histogram below the chart' },
+                ] as const
+              ).map(({ key, label, description }) => {
+                const active = settings?.marketPreferences[key] ?? true
+                return (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm text-zinc-300">{label}</div>
+                      <div className="text-xs text-zinc-500">{description}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => savePreferences.mutate({ [key]: !active })}
+                      className={cn(
+                        'relative h-7 w-12 flex-shrink-0 rounded-full transition-colors',
+                        active ? 'bg-emerald-600' : 'bg-zinc-700',
+                      )}
+                    >
+                      <span className={cn(
+                        'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all',
+                        active ? 'left-6' : 'left-1',
+                      )} />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
 

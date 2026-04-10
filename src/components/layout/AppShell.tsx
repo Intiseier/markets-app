@@ -1,10 +1,11 @@
 import { Outlet } from 'react-router'
 import { RefreshCw } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { Sidebar } from './Sidebar'
 
 export function AppShell() {
   const queryClient = useQueryClient()
+  const isFetching = useIsFetching({ queryKey: ['markets'] })
 
   function refreshAll() {
     queryClient.invalidateQueries({ queryKey: ['markets'] })
@@ -25,7 +26,7 @@ export function AppShell() {
             onClick={refreshAll}
             className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={12} className={isFetching > 0 ? 'animate-spin' : ''} />
             Refresh
           </button>
         </header>

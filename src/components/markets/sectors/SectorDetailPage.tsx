@@ -113,13 +113,13 @@ export function SectorDetailPage() {
       </div>
 
       {/* Data source note */}
-      {data && !data.hasFmpData && (
+      {data && !data.hasFmpData && data.constituents.length > 0 && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2 text-xs text-zinc-500">
-          Showing top holdings from Yahoo Finance. Add an FMP API key in{' '}
+          Showing top holdings by market cap. Weights are estimated from market cap proportions. Add an FMP API key in{' '}
           <button type="button" onClick={() => navigate('/settings')} className="text-emerald-500 hover:underline">
             Settings
           </button>{' '}
-          to get full holdings with share counts.
+          to get exact ETF weights and share counts.
         </div>
       )}
 

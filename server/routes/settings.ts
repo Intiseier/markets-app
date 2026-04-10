@@ -49,8 +49,18 @@ router.put('/api-keys', (req, res) => {
 })
 
 router.put('/market-preferences', (req, res) => {
-  const { chartStyle } = req.body as { chartStyle?: string }
-  writeSettings({ marketPreferences: { chartStyle: (chartStyle as any) ?? 'area' } })
+  const { chartStyle, defaultSma20, defaultSma50, defaultVolume } = req.body as {
+    chartStyle?: string
+    defaultSma20?: boolean
+    defaultSma50?: boolean
+    defaultVolume?: boolean
+  }
+  const patch: Record<string, unknown> = {}
+  if (chartStyle !== undefined) patch.chartStyle = chartStyle
+  if (defaultSma20 !== undefined) patch.defaultSma20 = Boolean(defaultSma20)
+  if (defaultSma50 !== undefined) patch.defaultSma50 = Boolean(defaultSma50)
+  if (defaultVolume !== undefined) patch.defaultVolume = Boolean(defaultVolume)
+  writeSettings({ marketPreferences: patch as any })
   res.json({ ok: true })
 })
 

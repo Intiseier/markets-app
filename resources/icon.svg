@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" fill="#252840"/>
+
+  <!-- Arms + body — angular shrug ¯\_(ツ)_/¯ -->
+  <path d="M 148 468 L 72 610 L 280 740 Q 512 820 744 740 L 952 610 L 876 468"
+        stroke="white" stroke-width="84" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Face: eyes -->
+  <circle cx="430" cy="348" r="46" fill="white"/>
+  <circle cx="594" cy="348" r="46" fill="white"/>
+
+  <!-- Face: smile -->
+  <path d="M 385 428 Q 512 532 639 428"
+        stroke="white" stroke-width="50" fill="none" stroke-linecap="round"/>
+
+  <!-- Green candlestick (left hand) -->
+  <!-- Top wick -->
+  <line x1="148" y1="268" x2="148" y2="338"
+        stroke="#22c55e" stroke-width="22" stroke-linecap="round"/>
+  <!-- Body -->
+  <rect x="112" y="338" width="72" height="132" rx="12" fill="#22c55e"/>
+  <!-- Bottom wick -->
+  <line x1="148" y1="470" x2="148" y2="535"
+        stroke="#22c55e" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Red candlestick (right hand) -->
+  <!-- Top wick -->
+  <line x1="876" y1="268" x2="876" y2="338"
+        stroke="#ef4444" stroke-width="22" stroke-linecap="round"/>
+  <!-- Body -->
+  <rect x="840" y="338" width="72" height="132" rx="12" fill="#ef4444"/>
+  <!-- Bottom wick -->
+  <line x1="876" y1="470" x2="876" y2="535"
+        stroke="#ef4444" stroke-width="22" stroke-linecap="round"/>
+</svg>

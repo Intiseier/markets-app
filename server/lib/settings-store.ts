@@ -17,14 +17,19 @@ export interface ApiKeys {
 }
 
 export interface AppSettings {
-  marketPreferences: { chartStyle: 'area' | 'line' | 'candles' }
+  marketPreferences: {
+    chartStyle: 'area' | 'line' | 'candles'
+    defaultSma20: boolean
+    defaultSma50: boolean
+    defaultVolume: boolean
+  }
   apiKeys: ApiKeys
   mode: 'simple' | 'advanced'
   aiRefreshSeconds: number
 }
 
 const DEFAULTS: AppSettings = {
-  marketPreferences: { chartStyle: 'area' },
+  marketPreferences: { chartStyle: 'area', defaultSma20: true, defaultSma50: true, defaultVolume: true },
   apiKeys: {},
   mode: 'simple',
   aiRefreshSeconds: 120,

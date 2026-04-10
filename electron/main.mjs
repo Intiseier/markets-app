@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, nativeImage } from 'electron'
 import { createRequire } from 'module'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -40,6 +40,8 @@ function startApiServer() {
 }
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '..', 'resources', 'icon.png')
+  const icon = nativeImage.createFromPath(iconPath)
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -48,7 +50,7 @@ function createWindow() {
     title: 'MarketMeh',
     backgroundColor: '#0a0a0a',
     titleBarStyle: 'hiddenInset',
-    icon: path.join(__dirname, '..', 'resources', 'icon.png'),
+    icon,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -72,6 +74,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.marketmeh.app')
   if (isDev) {
     createWindow()
   } else {

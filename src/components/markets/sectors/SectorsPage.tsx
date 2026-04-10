@@ -62,7 +62,7 @@ export function SectorsPage() {
                         : `rgba(239, 68, 68, ${0.05 + intensity * 0.25})`,
                     }}
                     className={cn(
-                      'flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all hover:scale-[1.02]',
+                      'flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-colors hover:brightness-110',
                       positive ? 'border-emerald-500/20' : 'border-red-500/20',
                     )}
                   >
@@ -91,30 +91,40 @@ export function SectorsPage() {
               </tr>
             </thead>
             <tbody>
-              {(sectorsQuery.isLoading ? [] : sectors)
-                .sort((a, b) => b.changePercent - a.changePercent)
-                .map((sector) => {
-                  const positive = sector.changePercent >= 0
-                  const etfKey = SECTOR_ETF_MAP[sector.name] ?? '--'
-                  return (
-                    <tr
-                      key={sector.name}
-                      className="border-b border-zinc-800/60 cursor-pointer transition-colors hover:bg-zinc-900/40"
-                      onClick={() => navigate(`/sectors/${etfKey}`)}
-                    >
-                      <td className="py-3 pr-6 font-medium text-zinc-200">{sector.name}</td>
-                      <td className="py-3 pr-6 text-zinc-500 font-mono text-xs">{etfKey}</td>
-                      <td className={cn('py-3 pr-6 text-right tabular-nums font-semibold', positive ? 'text-emerald-400' : 'text-red-400')}>
-                        {fmtPercent(sector.changePercent)}
-                      </td>
-                      <td className="py-3 text-right">
-                        {positive
-                          ? <TrendingUp size={16} className="inline text-emerald-500" />
-                          : <TrendingDown size={16} className="inline text-red-500" />}
-                      </td>
+              {sectorsQuery.isLoading
+                ? Array.from({ length: 11 }).map((_, i) => (
+                    <tr key={i} className="border-b border-zinc-800/60">
+                      <td className="py-3 pr-6"><div className="h-4 w-40 animate-pulse rounded bg-zinc-800" /></td>
+                      <td className="py-3 pr-6"><div className="h-4 w-10 animate-pulse rounded bg-zinc-800" /></td>
+                      <td className="py-3 pr-6 text-right"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-zinc-800" /></td>
+                      <td className="py-3 text-right"><div className="ml-auto h-4 w-4 animate-pulse rounded bg-zinc-800" /></td>
                     </tr>
-                  )
-                })}
+                  ))
+                : sectors
+                    .slice()
+                    .sort((a, b) => b.changePercent - a.changePercent)
+                    .map((sector) => {
+                      const positive = sector.changePercent >= 0
+                      const etfKey = SECTOR_ETF_MAP[sector.name] ?? '--'
+                      return (
+                        <tr
+                          key={sector.name}
+                          className="border-b border-zinc-800/60 cursor-pointer transition-colors hover:bg-zinc-900/40"
+                          onClick={() => navigate(`/sectors/${etfKey}`)}
+                        >
+                          <td className="py-3 pr-6 font-medium text-zinc-200">{sector.name}</td>
+                          <td className="py-3 pr-6 text-zinc-500 font-mono text-xs">{etfKey}</td>
+                          <td className={cn('py-3 pr-6 text-right tabular-nums font-semibold', positive ? 'text-emerald-400' : 'text-red-400')}>
+                            {fmtPercent(sector.changePercent)}
+                          </td>
+                          <td className="py-3 text-right">
+                            {positive
+                              ? <TrendingUp size={16} className="inline text-emerald-500" />
+                              : <TrendingDown size={16} className="inline text-red-500" />}
+                          </td>
+                        </tr>
+                      )
+                    })}
             </tbody>
           </table>
         </div>

@@ -152,7 +152,7 @@ export function ScreenerPage() {
               {data.results.length} results
               {data.hasFmpData
                 ? ' · via FMP'
-                : ' · fallback (add FMP key for full screening)'}
+                : ' · fallback (add FMP key for advanced screening)'}
               {isFetching && !isLoading && <span className="ml-2 text-zinc-600">Refreshing…</span>}
             </div>
           )}

@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "electron": "concurrently --kill-others-on-fail --names api,ui,electron \"npm run dev:api\" \"npm run dev:ui\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && npm run build:server && electron-builder",
+    "icons": "node scripts/generate-icons.mjs",
     "start": "npm run dev"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "electron": "^35.2.1",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
@@ -57,12 +59,24 @@
       "electron/**/*"
     ],
     "extraResources": [
-      { "from": "dist", "to": "dist" },
-      { "from": "resources/server.cjs", "to": "server.cjs" },
-      { "from": "resources/icon.png", "to": "icon.png" }
+      {
+        "from": "dist",
+        "to": "dist"
+      },
+      {
+        "from": "resources/server.cjs",
+        "to": "server.cjs"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      }
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "resources/icon.ico"
     },
     "mac": {
